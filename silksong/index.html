@@ -1,2 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>丝之歌收集度检查</title>
+  <link rel="icon" href="icon.png" type="image/png">
+  <style>
+    body { font-family: sans-serif; margin: 20px; }
+    .drop-zone {
+      border: 2px dashed #999;
+      border-radius: 10px;
+      padding: 40px;
+      width: 400px;
+      margin: 20px auto;
+      color: #666;
+      text-align: center;
+    }
+    .drop-zone.highlight {
+      border-color: #33a;
+      background: #eef;
+    }
+    .drop-zone input { display: none; }
+    button { margin-top: 15px; padding: 6px 12px; }
+    .category {
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      margin: 10px auto;
+      width: 600px;
+      text-align: left;
+    }
+    .category-header {
+      background: #f0f0f0;
+      padding: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .category-header::before {
+      content: "▶ ";
+      display: inline-block;
+      transition: transform 0.2s;
+    }
+    .category-header.expanded::before {
+      transform: rotate(90deg);
+    }
+    .category-content {
+      padding: 10px;
+      display: none; /* 默认收缩 */
+    }
+    .category-content ul {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .true { color: green; }
+    .false { color: red; }
+  </style>
+</head>
+<body>
+  <div class="drop-zone" id="drop-zone">
+    拖拽 .dat 文件到这里<br>
+    或者
+    <br>
+    <button id="fileButton">选择文件</button>
+    <input type="file" id="fileInput" accept=".dat">
+  </div>
 
-analyse save file
+  <div id="result"></div>
+
+  <script>
+    const dropZone = document.getElementById("drop-zone");
+    const fileInput = document.getElementById("fileInput");
+    const fileButton = document.getElementById("fileButton");
+    const resultDiv = document.getElementById("result");
+
+    const SERVER_URL = "http://127.0.0.1:5000";
+
+    fileButton.addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", e => {
+      if (e.target.files.length > 0) {
+        uploadFile(e.target.files[0]);
+      }
+    });
+
+    dropZone.addEventListener("dragover", e => {
+      e.preventDefault();
+      dropZone.classList.add("highlight");
+    });
+    dropZone.addEventListener("dragleave", () => {
+      dropZone.classList.remove("highlight");
+    });
+    dropZone.addEventListener("drop", e => {
+      e.preventDefault();
+      dropZone.classList.remove("highlight");
+      if (e.dataTransfer.files.length > 0) {
+        uploadFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    async function uploadFile(file) {
+      if (!file.name.endsWith(".dat")) {
+        alert("请选择 .dat 文件");
+        return;
+      }
+      const formData = new FormData();
+      formData.append("file", file);
+
+      try {
+        const resp = await fetch(`${SERVER_URL}/upload-save`, { method: "POST", body: formData });
+        if (resp.ok) {
+          const json = await resp.json();
+          renderResult(json);
+        } else {
+          alert("上传失败：" + resp.statusText);
+        }
+      } catch (err) {
+        console.error(err);
+        alert("上传出错");
+      }
+    }
+
+function renderResult(data) {
+  resultDiv.innerHTML = "";
+
+  // 渲染基本信息（默认展开）
+  if (Array.isArray(data["基本信息"])) {
+    createCategory("基本信息", data["基本信息"], false, true);
+  }
+
+  // 渲染 data 下的分类（默认收缩）
+  if (data["data"] && typeof data["data"] === "object") {
+    for (const [category, items] of Object.entries(data["data"])) {
+      createCategory(category, items, true, false);
+    }
+  }
+}
+
+
+function createCategory(title, items, isBooleanCategory, defaultExpand = false) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "category";
+
+  const header = document.createElement("div");
+  header.className = "category-header";
+  header.textContent = title;
+  wrapper.appendChild(header);
+
+  const content = document.createElement("div");
+  content.className = "category-content";
+  const ul = document.createElement("ul");
+
+  if (Array.isArray(items)) {
+    items.forEach((obj) => {
+      const li = document.createElement("li");
+      if (isBooleanCategory) {
+        li.textContent = `${obj.name} —— ${obj.isAcquire ? "已获取" : "未获取"}`;
+        li.className = obj.isAcquire ? "true" : "false";
+      } else {
+        li.textContent = `${obj.name} —— ${obj.value}`;
+        li.style.color = "black";
+      }
+      ul.appendChild(li);
+    });
+  }
+
+  content.appendChild(ul);
+  wrapper.appendChild(content);
+
+  // 默认展开/收缩
+  if (defaultExpand) {
+    content.style.display = "block";
+    header.classList.add("expanded");
+  } else {
+    content.style.display = "none";
+  }
+
+  header.addEventListener("click", () => {
+    const isHidden = window.getComputedStyle(content).display === "none";
+    content.style.display = isHidden ? "block" : "none";
+    header.classList.toggle("expanded", isHidden);
+  });
+
+  resultDiv.appendChild(wrapper);
+}
+  </script>
+</body>
+</html>
