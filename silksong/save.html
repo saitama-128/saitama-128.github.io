@@ -119,6 +119,13 @@
     }
 
 function renderResult(data) {
+  const CATEGORY_ORDER = [
+  "面甲碎片",
+  "灵丝轴碎片",
+  "忆境纪念盒",
+  "制造金属",
+  "其它"
+];
   resultDiv.innerHTML = "";
 
   // 渲染基本信息（默认展开）
@@ -128,11 +135,31 @@ function renderResult(data) {
 
   // 渲染 data 下的分类（默认收缩）
   if (data["data"] && typeof data["data"] === "object") {
-    for (const [category, items] of Object.entries(data["data"])) {
+    const entries = Object.entries(data["data"]);
+
+    // 先根据 CATEGORY_ORDER 排序
+    const orderedEntries = [];
+
+    // 先加在 CATEGORY_ORDER 里出现的
+    CATEGORY_ORDER.forEach(category => {
+      const found = entries.find(([key]) => key === category);
+      if (found) orderedEntries.push(found);
+    });
+
+    // 再加上没指定顺序的
+    entries.forEach(([key, items]) => {
+      if (!CATEGORY_ORDER.includes(key)) {
+        orderedEntries.push([key, items]);
+      }
+    });
+
+    // 渲染
+    for (const [category, items] of orderedEntries) {
       createCategory(category, items, true, false);
     }
   }
 }
+
 
 
 function createCategory(title, items, isBooleanCategory, defaultExpand = false) {
